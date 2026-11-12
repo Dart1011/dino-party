@@ -3,7 +3,7 @@ import { Room } from './network.js';
 import { cleanCharacter, cleanCode, cleanName, CHARACTERS, MAX_PLAYERS, playerColor, shareUrl } from './protocol.js';
 import { comparePlayers, Race } from './race.js';
 import { sceneForDistance } from './scene.js';
-import { drawCharacterPreview, Renderer } from './renderer.js';
+import { drawCharacterPreview, Renderer, sidAssetsReady } from './renderer.js';
 
 const $ = id => document.getElementById(id);
 const screens = { home: $('home-screen'), lobby: $('lobby-screen'), results: $('results-screen') };
@@ -33,6 +33,10 @@ try {
   $('name-input').value = `Dino ${Math.floor(10 + Math.random() * 90)}`;
 }
 drawCharacterPreview($('character-preview'), character);
+sidAssetsReady.then(() => {
+  drawCharacterPreview($('character-preview'), character);
+  renderLobby();
+}).catch(() => {});
 
 const controls = new Controls(sendControls);
 room = createRoom();

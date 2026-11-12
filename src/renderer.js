@@ -3,6 +3,24 @@ import { Effects } from './effects.js';
 import { playerColor } from './protocol.js';
 import { DAY, sceneForDistance } from './scene.js';
 
+const SID_FRAME_SIZE = 512;
+const SID_RUN_FRAMES = [0, 1, 2, 3];
+const SID_FOOT_Y = [480, 480, 477, 481, 389, 476];
+const SID_HUES = new Map([
+  ['#ef8354', '0deg'], ['#4f8edc', '185deg'], ['#8c68c9', '265deg'],
+  ['#41a67a', '105deg'], ['#e3a72f', '25deg'], ['#d85b83', '315deg'],
+]);
+const sidImage = new Image();
+let sidLoaded = false;
+export const sidAssetsReady = new Promise((resolve, reject) => {
+  sidImage.addEventListener('load', () => {
+    sidLoaded = true;
+    resolve();
+  }, { once: true });
+  sidImage.addEventListener('error', () => reject(new Error('Sid’s sprite sheet could not be loaded.')), { once: true });
+});
+sidImage.src = `${import.meta.env.BASE_URL}sid-sprite-sheet.png`;
+
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -78,7 +96,7 @@ export class Renderer {
       const x = this.width * (0.12 + index * 0.09);
       const bounce = Math.abs(Math.sin(time * 8 + index)) * 3;
       drawShadow(ctx, x, ground, 40, 0.9, DAY, 0.2);
-      drawDino(ctx, x, ground - bounce, 0.9, playerColor(index), {
+      drawActor(ctx, x, ground - bounce, 0.9, playerColor(index), {
         phase: Math.floor(time * 10 + index) % 2,
         grounded: true,
         tailWag: Math.sin(time * 7 + index) * 3,
@@ -146,7 +164,7 @@ export class Renderer {
       const flashColor = hitAge >= 0 && hitAge < 0.5 ? (Math.floor(hitAge * 12) % 2 ? '#ef6a5b' : '#fff6e6') : null;
       if (player.immuneTime > 0 && Math.floor(now / 90) % 2 === 0) ctx.globalAlpha = 0.42;
       else ctx.globalAlpha = player.out ? 0.45 : 1;
-      drawDino(ctx, x, y, scale, playerColor(player.character), {
+      drawActor(ctx, x, y, scale, playerColor(player.character), {
         phase: Math.floor(player.distance / 35) % 2,
         grounded: player.grounded,
         ducking: player.ducking || player.out,
@@ -154,6 +172,7 @@ export class Renderer {
         background: scene.theme.background,
         scaleX,
         scaleY,
+        landing: landingAge >= 0 && landingAge < 1,
         flashColor,
         tailWag: Math.sin(player.distance / 42) * 3,
         hatTilt: Math.sin(player.distance / 75) * 0.08 + player.vy / 850 * 0.1,
@@ -352,7 +371,38 @@ function drawShadow(ctx, x, ground, width, scale, theme, alpha) {
   ctx.restore();
 }
 
-function drawDino(ctx, x, y, scale, color, options = {}) {
+function drawActor(ctx, x, y, scale, color, options = {}) {
+  if (!sidLoaded) {
+    drawFallbackDino(ctx, x, y, scale, color, options);
+    return;
+  }
+  const { grounded = true, ducking = false, landing = false, scaleX = 1, scaleY = 1, flashColor = null } = options;
+  let frame = Number.isInteger(options.frame) ? options.frame : SID_RUN_FRAMES[Math.floor(performance.now() / 100) % SID_RUN_FRAMES.length];
+  if (landing || ducking) frame = 5;
+  if (!grounded) frame = 4;
+  const spriteScale = scale * 0.18;
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  ctx.scale(scaleX, scaleY);
+  ctx.imageSmoothingEnabled = false;
+  ctx.filter = flashColor
+    ? flashColor === '#fff6e6' ? 'brightness(1.8) saturate(0.25)' : 'sepia(1) saturate(6) hue-rotate(-30deg)'
+    : `hue-rotate(${SID_HUES.get(color) || '0deg'})`;
+  ctx.drawImage(
+    sidImage,
+    frame % 3 * SID_FRAME_SIZE,
+    Math.floor(frame / 3) * SID_FRAME_SIZE,
+    SID_FRAME_SIZE,
+    SID_FRAME_SIZE,
+    -256 * spriteScale,
+    -SID_FOOT_Y[frame] * spriteScale,
+    SID_FRAME_SIZE * spriteScale,
+    SID_FRAME_SIZE * spriteScale,
+  );
+  ctx.restore();
+}
+
+function drawFallbackDino(ctx, x, y, scale, color, options = {}) {
   const {
     phase = 0, grounded = true, ducking = false, ink = DAY.ink, background = DAY.background,
     scaleX = 1, scaleY = 1, flashColor = null, tailWag = 0, hatTilt = 0,
@@ -496,5 +546,5 @@ export function drawCharacterPreview(canvas, character) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.imageSmoothingEnabled = false;
-  drawDino(ctx, 27, 60, 0.72, playerColor(character), { phase: 0, grounded: true, hatTilt: -0.08 });
+  drawActor(ctx, 30, 60, 0.72, playerColor(character), { frame: 0, grounded: true, hatTilt: -0.08 });
 }
