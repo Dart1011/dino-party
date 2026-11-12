@@ -340,6 +340,7 @@ function updateCountdown() {
 
 function handleRaceEvents(events) {
   if (!Array.isArray(events)) return;
+  renderer.handleEvents(events, room.localId);
   for (const event of events) {
     if (event.id !== room.localId) continue;
     if (event.type === 'hit') toast('Ouch! One life used.');
