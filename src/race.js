@@ -66,7 +66,7 @@ export class Race {
       player.stunTime = Math.max(0, player.stunTime - dt);
       player.ducking = input.duck;
 
-      const targetSpeed = player.stunTime > 0 ? 150 : 350 + Math.min(500, this.time * 2.6);
+      const targetSpeed = player.stunTime > 0 ? 150 : 350 + Math.min(600, this.time * 4);
       const acceleration = targetSpeed > player.speed ? 180 : 430;
       player.speed += Math.max(-acceleration * dt, Math.min(acceleration * dt, targetSpeed - player.speed));
       player.distance += player.speed * dt;
