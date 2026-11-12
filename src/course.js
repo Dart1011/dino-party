@@ -1,5 +1,3 @@
-export const FINISH_DISTANCE = 15000;
-
 function random(seed) {
   let value = seed >>> 0;
   return () => {
@@ -11,23 +9,28 @@ function random(seed) {
   };
 }
 
-export function generateCourse(seed) {
-  const next = random(seed);
-  const obstacles = [];
-  let x = 900;
-  let id = 0;
-  while (x < FINISH_DISTANCE - 500) {
-    const roll = next();
-    let type;
-    if (x > 3200 && roll > 0.77) type = next() > 0.48 ? 'bird-high' : 'bird-low';
-    else if (roll > 0.52) type = 'cactus-group';
-    else if (roll > 0.24) type = 'cactus-large';
-    else type = 'cactus-small';
-    obstacles.push({ id: id++, type, x: Math.round(x) });
-    const difficulty = Math.min(1, x / FINISH_DISTANCE);
-    x += 410 + next() * 270 - difficulty * 65;
+export class Course {
+  constructor(seed) {
+    this.next = random(seed);
+    this.obstacles = [];
+    this.nextX = 900;
+    this.nextId = 0;
   }
-  return obstacles;
+
+  ensure(distance) {
+    while (this.nextX < distance) {
+      const x = this.nextX;
+      const roll = this.next();
+      let type;
+      if (x > 3200 && roll > 0.77) type = this.next() > 0.48 ? 'bird-high' : 'bird-low';
+      else if (roll > 0.52) type = 'cactus-group';
+      else if (roll > 0.24) type = 'cactus-large';
+      else type = 'cactus-small';
+      this.obstacles.push({ id: this.nextId++, type, x: Math.round(x) });
+      const difficulty = Math.min(1, x / 40000);
+      this.nextX += 430 + this.next() * 280 + difficulty * 170;
+    }
+  }
 }
 
 export function obstacleSize(type) {

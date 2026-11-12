@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#f4efe3" />
-    <meta name="description" content="The offline dinosaur runner, now with multiplayer. Create a room, share a link, and race your friends in Dino Party." />
-    <title>Dino Party — Multiplayer Dinosaur Racing</title>
+    <meta name="description" content="An endless multiplayer dinosaur runner. Create a room, share a link, and run through day and night with your friends in Dino Party." />
+    <title>Dino Party — Endless Multiplayer Dinosaur Runner</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="stylesheet" href="./src/style.css" />
   </head>
@@ -30,7 +30,7 @@
         <div class="hero-copy">
           <div class="eyebrow"><span class="live-dot"></span> NO WI-FI? NO PROBLEM. JUST FRIENDS.</div>
           <h1>DINO<br /><span>PARTY</span></h1>
-          <p>The offline classic, now online.<br />Same desert. Same obstacles. One winner.</p>
+          <p>The offline classic, now online.<br />No finish line. Just day, night, and your crew.</p>
           <div class="feature-row">
             <span>2–8 players</span><span>Free to play</span><span>No accounts</span>
           </div>
@@ -74,7 +74,7 @@
           </div>
           <div class="lobby-section-heading"><span>RUNNERS</span><span id="player-count"></span></div>
           <div id="lobby-players" class="lobby-players"></div>
-          <button id="start-button" class="primary-button"><span>Start race</span><span>→</span></button>
+          <button id="start-button" class="primary-button"><span>Start run</span><span>→</span></button>
           <p id="host-waiting" class="waiting-message" hidden><span class="spinner"></span> Waiting for the host to start…</p>
           <p class="host-note">The host’s browser runs the room. Keep that tab open while playing.</p>
         </div>
@@ -82,11 +82,11 @@
 
       <section id="results-screen" class="screen results-screen" hidden>
         <div class="panel results-panel">
-          <div class="eyebrow">RACE COMPLETE</div>
+          <div class="eyebrow">RUN COMPLETE</div>
           <h2 id="results-title">Desert conquered!</h2>
-          <p id="results-subtitle">Here’s how the crew finished</p>
+          <p id="results-subtitle">Here’s how far the crew ran</p>
           <div id="results-list" class="results-list"></div>
-          <button id="rematch-button" class="primary-button"><span>Race again</span><span>↻</span></button>
+          <button id="rematch-button" class="primary-button"><span>Run again</span><span>↻</span></button>
           <button id="lobby-button" class="text-button" hidden>Back to lobby</button>
           <p id="results-waiting" class="waiting-message" hidden>Waiting for the host to start a rematch…</p>
         </div>
@@ -95,9 +95,9 @@
 
     <section id="race-hud" aria-label="Race information" hidden>
       <div class="race-status">
-        <div class="race-status-top"><span id="race-distance">0 M</span><span id="race-time">1:15</span></div>
+        <div class="race-status-top"><span id="race-distance">0 M</span><span id="race-time">DAY</span></div>
         <div class="progress-track"><div id="race-progress"></div></div>
-        <span class="finish-label">1,500 M TO THE FINISH</span>
+        <span id="scene-label" class="finish-label">700 M UNTIL NIGHTFALL</span>
       </div>
       <div id="leaderboard" class="leaderboard panel"></div>
       <div id="player-stats" class="player-stats panel"></div>
@@ -119,7 +119,7 @@
       <ol class="help-list">
         <li><b>Create and share</b><span>One player creates a room and sends the invite link. Friends open it, choose a name, and join.</span></li>
         <li><b>Jump and duck</b><span>Jump over cacti and low pterodactyls. Duck under high pterodactyls. While airborne, duck to land faster.</span></li>
-        <li><b>Reach the finish</b><span>You have three lives. A hit costs one and slows you down. The first runner to 1,500 meters wins; if time expires, the farthest runner wins.</span></li>
+        <li><b>Run endlessly</b><span>There is no finish line or time limit. Day alternates with night as you run. You have three lives; when every runner is out, the greatest distance wins.</span></li>
       </ol>
       <div class="key-guide"><span><kbd>SPACE</kbd> <kbd>↑</kbd> or <kbd>W</kbd> jump</span><span><kbd>↓</kbd> or <kbd>S</kbd> duck</span></div>
       <p>On a phone, use the on-screen buttons. You can practice by creating a room and starting alone. Late joiners spectate until the next race.</p>

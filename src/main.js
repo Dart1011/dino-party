@@ -1,8 +1,8 @@
 import { Controls } from './input.js';
 import { Room } from './network.js';
 import { cleanCharacter, cleanCode, cleanName, CHARACTERS, MAX_PLAYERS, playerColor, shareUrl } from './protocol.js';
-import { FINISH_DISTANCE } from './course.js';
-import { comparePlayers, Race, RACE_DURATION } from './race.js';
+import { comparePlayers, Race } from './race.js';
+import { sceneForDistance } from './scene.js';
 import { drawCharacterPreview, Renderer } from './renderer.js';
 
 const $ = id => document.getElementById(id);
@@ -88,6 +88,7 @@ function createRoom() {
 function setView(next) {
   view = next;
   document.body.dataset.view = next;
+  if (next === 'home' || next === 'lobby') document.body.dataset.scene = 'day';
   for (const [name, screen] of Object.entries(screens)) screen.hidden = name !== next;
   const racing = next === 'race';
   $('race-hud').hidden = !racing;
@@ -189,7 +190,7 @@ function renderLobby() {
   $('share-link').value = shareUrl(room.code);
   $('player-count').textContent = `${roomPlayers.length} / ${MAX_PLAYERS}`;
   $('start-button').hidden = !room.isHost;
-  $('start-button').querySelector('span').textContent = roomPlayers.length === 1 ? 'Start solo race' : 'Start race';
+  $('start-button').querySelector('span').textContent = roomPlayers.length === 1 ? 'Start solo run' : 'Start run';
   $('host-waiting').hidden = room.isHost;
   $('lobby-subtitle').textContent = room.isHost ? 'Share this link with your friends' : 'You’re in! The host will start the race';
   const list = $('lobby-players');
@@ -278,11 +279,13 @@ function updateHUD() {
   const local = latestSnapshot.players.find(player => player.id === room.localId);
   const camera = local || sortedPlayers()[0];
   if (camera) {
+    const scene = sceneForDistance(camera.distance);
     $('race-distance').textContent = `${Math.floor(camera.distance / 10)} M`;
-    $('race-progress').style.width = `${Math.min(100, camera.distance / FINISH_DISTANCE * 100)}%`;
+    $('race-progress').style.width = `${scene.progress * 100}%`;
+    $('race-time').textContent = scene.nightAmount >= 0.5 ? 'NIGHT' : 'DAY';
+    $('scene-label').textContent = `${scene.remaining} M UNTIL ${scene.next}`;
+    document.body.dataset.scene = scene.nightAmount >= 0.5 ? 'night' : 'day';
   }
-  const seconds = Math.max(0, Math.ceil(RACE_DURATION - latestSnapshot.time));
-  $('race-time').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   const leaderboard = $('leaderboard');
   leaderboard.replaceChildren();
   sortedPlayers().forEach((player, index) => {
@@ -296,7 +299,7 @@ function updateHUD() {
     name.textContent = player.name;
     const distance = document.createElement('span');
     distance.className = 'leader-distance';
-    distance.textContent = player.finished ? formatTime(player.finishTime) : player.disconnected ? 'LEFT' : player.out ? 'OUT' : `${Math.floor(player.distance / 10)}m`;
+    distance.textContent = player.disconnected ? 'LEFT' : player.out ? `OUT · ${Math.floor(player.distance / 10)}m` : `${Math.floor(player.distance / 10)}m`;
     row.append(rank, name, distance);
     leaderboard.append(row);
   });
@@ -312,7 +315,7 @@ function updateHUD() {
     }
     const speed = document.createElement('span');
     speed.className = 'speed-readout';
-    speed.textContent = local.out ? 'OUT' : local.finished ? 'FINISHED' : `${Math.round(local.speed / 5)} KM/H`;
+    speed.textContent = local.out ? 'OUT' : `${Math.round(local.speed / 5)} KM/H`;
     $('player-stats').replaceChildren(lives, speed);
   }
 }
@@ -340,8 +343,7 @@ function handleRaceEvents(events) {
   for (const event of events) {
     if (event.id !== room.localId) continue;
     if (event.type === 'hit') toast('Ouch! One life used.');
-    if (event.type === 'out') toast('You’re out. Watch your crew finish!');
-    if (event.type === 'finish') toast('You reached the finish!');
+    if (event.type === 'out') toast('You’re out. Watch your crew run!');
   }
 }
 
@@ -350,8 +352,8 @@ function showResults() {
   const standings = sortedPlayers();
   const local = standings.find(player => player.id === room.localId);
   const winner = standings[0];
-  $('results-title').textContent = local && winner?.id === room.localId ? 'You ruled the desert!' : winner ? `${winner.name} wins!` : 'Race complete!';
-  $('results-subtitle').textContent = local?.finished ? `You finished in ${formatTime(local.finishTime)}.` : local?.out ? 'Three hits, but plenty of heart. Ready for another?' : 'The desert is calling. Ready for another run?';
+  $('results-title').textContent = local && winner?.id === room.localId ? 'You ruled the desert!' : winner ? `${winner.name} wins!` : 'Run complete!';
+  $('results-subtitle').textContent = local ? `You ran ${Math.floor(local.distance / 10)} meters. Ready for another?` : 'The desert is calling. Ready for another run?';
   const list = $('results-list');
   list.replaceChildren();
   standings.forEach((player, index) => {
@@ -366,17 +368,13 @@ function showResults() {
     name.textContent = player.id === room.localId ? `${player.name} (you)` : player.name;
     const detail = document.createElement('span');
     detail.className = 'result-detail';
-    detail.textContent = player.finished ? formatTime(player.finishTime) : player.disconnected ? 'Left' : player.out ? `Out · ${Math.floor(player.distance / 10)} m` : `${Math.floor(player.distance / 10)} m`;
+    detail.textContent = `${Math.floor(player.distance / 10)} m${player.disconnected ? ' · Left' : ''}`;
     row.append(rank, name, detail);
     list.append(row);
   });
   $('rematch-button').hidden = !room.isHost;
   $('lobby-button').hidden = !room.isHost;
   $('results-waiting').hidden = room.isHost;
-}
-
-function formatTime(seconds) {
-  return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}.${Math.floor((seconds % 1) * 10)}`;
 }
 
 function sendControls(input) {

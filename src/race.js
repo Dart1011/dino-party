@@ -1,14 +1,14 @@
-import { FINISH_DISTANCE, generateCourse, obstacleSize } from './course.js';
+import { Course, obstacleSize } from './course.js';
 import { sanitizeInput } from './protocol.js';
 
-export const RACE_DURATION = 75;
 const EMPTY_INPUT = sanitizeInput();
 const round = value => Math.round(value * 10) / 10;
 
 export class Race {
   constructor(players, seed) {
     this.seed = seed;
-    this.course = generateCourse(seed);
+    this.course = new Course(seed);
+    this.course.ensure(2500);
     this.time = 0;
     this.ended = false;
     this.events = [];
@@ -26,8 +26,6 @@ export class Race {
       grounded: true,
       immuneTime: 0,
       stunTime: 0,
-      finished: false,
-      finishTime: null,
       out: false,
       disconnected: false,
     }]));
@@ -39,7 +37,7 @@ export class Race {
     const previous = this.inputs.get(id) || EMPTY_INPUT;
     const next = sanitizeInput(input);
     const player = this.players.get(id);
-    if (next.jump && !previous.jump && player.grounded && !player.finished && !player.out && player.stunTime <= 0) {
+    if (next.jump && !previous.jump && player.grounded && !player.out && player.stunTime <= 0) {
       player.vy = 850;
       player.grounded = false;
       player.ducking = false;
@@ -50,7 +48,7 @@ export class Race {
 
   disconnect(id) {
     const player = this.players.get(id);
-    if (!player || player.finished) return;
+    if (!player) return;
     player.disconnected = true;
     player.out = true;
     this.inputs.set(id, { ...EMPTY_INPUT });
@@ -60,22 +58,19 @@ export class Race {
     if (this.ended) return;
     dt = Math.min(Math.max(dt, 0), 0.05);
     this.time += dt;
-    let completed = 0;
 
     for (const player of this.players.values()) {
-      if (player.finished || player.out) {
-        completed += 1;
-        continue;
-      }
+      if (player.out) continue;
       const input = this.inputs.get(player.id) || EMPTY_INPUT;
       player.immuneTime = Math.max(0, player.immuneTime - dt);
       player.stunTime = Math.max(0, player.stunTime - dt);
       player.ducking = input.duck;
 
-      const targetSpeed = player.stunTime > 0 ? 150 : 350 + Math.min(150, this.time * 2.4);
+      const targetSpeed = player.stunTime > 0 ? 150 : 350 + Math.min(500, this.time * 2.6);
       const acceleration = targetSpeed > player.speed ? 180 : 430;
       player.speed += Math.max(-acceleration * dt, Math.min(acceleration * dt, targetSpeed - player.speed));
       player.distance += player.speed * dt;
+      this.course.ensure(player.distance + 1800);
 
       if (!player.grounded) {
         const gravity = input.duck ? 3400 : 2200;
@@ -90,19 +85,9 @@ export class Race {
       }
 
       this.checkCollisions(player);
-      if (player.distance >= FINISH_DISTANCE && !player.out) {
-        player.distance = FINISH_DISTANCE;
-        player.finished = true;
-        player.finishTime = this.time;
-        player.speed = 0;
-        player.ducking = false;
-        this.events.push({ type: 'finish', id: player.id });
-        completed += 1;
-      }
     }
 
-    if (this.time >= RACE_DURATION) this.ended = true;
-    if (completed === this.players.size) this.ended = true;
+    this.ended = [...this.players.values()].every(player => player.out);
   }
 
   checkCollisions(player) {
@@ -113,7 +98,7 @@ export class Race {
       bottom: player.y,
       top: player.y + (player.ducking ? 30 : 54),
     };
-    for (const obstacle of this.course) {
+    for (const obstacle of this.course.obstacles) {
       const dx = obstacle.x - player.distance;
       if (dx > 80) break;
       if (dx < -80) continue;
@@ -168,8 +153,6 @@ export class Race {
 }
 
 export function comparePlayers(a, b) {
-  if (a.finished && b.finished) return a.finishTime - b.finishTime;
-  if (a.finished !== b.finished) return a.finished ? -1 : 1;
   if (a.out !== b.out) return a.out ? 1 : -1;
   return b.distance - a.distance;
 }
