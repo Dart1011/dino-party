@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#f4efe3" />
+    <meta name="description" content="The offline dinosaur runner, now with multiplayer. Create a room, share a link, and race your friends in Dino Party." />
+    <title>Dino Party — Multiplayer Dinosaur Racing</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <canvas id="game-canvas" aria-label="Multiplayer dinosaur runner"></canvas>
+    <div class="paper-grain" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <button id="brand-home" class="brand" aria-label="Dino Party home">
+        <span class="brand-mark" aria-hidden="true">D</span>
+        <span>DINO <b>PARTY</b></span>
+      </button>
+      <div class="top-actions">
+        <span id="connection-pill" class="connection-pill" hidden><i></i><span></span></span>
+        <button id="help-button" class="icon-button" aria-label="How to play" title="How to play">?</button>
+        <button id="leave-button" class="small-button" hidden>Leave room</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="home-screen" class="screen home-screen">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="live-dot"></span> NO WI-FI? NO PROBLEM. JUST FRIENDS.</div>
+          <h1>DINO<br /><span>PARTY</span></h1>
+          <p>The offline classic, now online.<br />Same desert. Same obstacles. One winner.</p>
+          <div class="feature-row">
+            <span>2–8 players</span><span>Free to play</span><span>No accounts</span>
+          </div>
+        </div>
+
+        <div class="panel home-panel">
+          <div id="invite-banner" class="invite-banner" hidden>Your crew is waiting in <strong id="invite-code"></strong></div>
+          <div class="profile-heading">
+            <div><span class="step-label">PICK YOUR RUNNER</span><h2>Ready, set, dino!</h2></div>
+            <div class="character-picker">
+              <button id="character-previous" class="picker-arrow" aria-label="Previous dinosaur">‹</button>
+              <canvas id="character-preview" width="64" height="64" aria-label="Selected dinosaur"></canvas>
+              <button id="character-next" class="picker-arrow" aria-label="Next dinosaur">›</button>
+            </div>
+          </div>
+          <label class="field-label" for="name-input">Display name</label>
+          <input id="name-input" class="text-input" maxlength="16" autocomplete="nickname" placeholder="Your name" />
+          <button id="create-button" class="primary-button"><span>Create a room</span><span aria-hidden="true">→</span></button>
+          <div class="divider"><span>OR JOIN YOUR CREW</span></div>
+          <div class="join-row">
+            <input id="code-input" class="text-input code-input" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ROOM CODE" aria-label="Six-character room code" />
+            <button id="join-button" class="secondary-button">Join room</button>
+          </div>
+          <p id="home-error" class="form-error" role="alert" hidden></p>
+          <p id="busy-message" class="busy-message" hidden><span class="spinner"></span><span>Connecting…</span></p>
+          <p class="privacy-note">Your browser connects directly to the host. No sign-up needed.</p>
+        </div>
+      </section>
+
+      <section id="lobby-screen" class="screen lobby-screen" hidden>
+        <div class="panel lobby-panel">
+          <div class="eyebrow">YOUR CREW IS ASSEMBLING</div>
+          <h2>Room <button id="copy-code" class="room-code" title="Copy room code"></button></h2>
+          <p id="lobby-subtitle">Share this link with your friends</p>
+          <div class="share-row">
+            <input id="share-link" class="text-input" readonly aria-label="Room invite link" />
+            <button id="copy-link" class="secondary-button">Copy link</button>
+            <button id="native-share" class="icon-button share-button" aria-label="Share invite" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></svg>
+            </button>
+          </div>
+          <div class="lobby-section-heading"><span>RUNNERS</span><span id="player-count"></span></div>
+          <div id="lobby-players" class="lobby-players"></div>
+          <button id="start-button" class="primary-button"><span>Start race</span><span>→</span></button>
+          <p id="host-waiting" class="waiting-message" hidden><span class="spinner"></span> Waiting for the host to start…</p>
+          <p class="host-note">The host’s browser runs the room. Keep that tab open while playing.</p>
+        </div>
+      </section>
+
+      <section id="results-screen" class="screen results-screen" hidden>
+        <div class="panel results-panel">
+          <div class="eyebrow">RACE COMPLETE</div>
+          <h2 id="results-title">Desert conquered!</h2>
+          <p id="results-subtitle">Here’s how the crew finished</p>
+          <div id="results-list" class="results-list"></div>
+          <button id="rematch-button" class="primary-button"><span>Race again</span><span>↻</span></button>
+          <button id="lobby-button" class="text-button" hidden>Back to lobby</button>
+          <p id="results-waiting" class="waiting-message" hidden>Waiting for the host to start a rematch…</p>
+        </div>
+      </section>
+    </main>
+
+    <section id="race-hud" aria-label="Race information" hidden>
+      <div class="race-status">
+        <div class="race-status-top"><span id="race-distance">0 M</span><span id="race-time">1:15</span></div>
+        <div class="progress-track"><div id="race-progress"></div></div>
+        <span class="finish-label">1,500 M TO THE FINISH</span>
+      </div>
+      <div id="leaderboard" class="leaderboard panel"></div>
+      <div id="player-stats" class="player-stats panel"></div>
+      <div id="spectator-notice" class="spectator-notice panel" hidden>You’re spectating this race. You’ll run in the next one.</div>
+      <div class="desktop-controls"><span><kbd>SPACE</kbd> / <kbd>↑</kbd> jump</span><span><kbd>↓</kbd> duck &amp; fast-fall</span></div>
+      <div id="mobile-controls" class="mobile-controls">
+        <button data-control="duck" class="duck-control" aria-label="Duck"><span>↓</span> DUCK</button>
+        <button data-control="jump" class="jump-control" aria-label="Jump"><span>↑</span> JUMP</button>
+      </div>
+    </section>
+
+    <div id="countdown" class="countdown" hidden><span id="countdown-number">3</span><small>GET READY</small></div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <dialog id="help-dialog" class="help-dialog panel">
+      <button id="close-help" class="dialog-close icon-button" aria-label="Close instructions">×</button>
+      <div class="eyebrow">HOW TO PLAY</div>
+      <h2>Outrun the whole crew</h2>
+      <ol class="help-list">
+        <li><b>Create and share</b><span>One player creates a room and sends the invite link. Friends open it, choose a name, and join.</span></li>
+        <li><b>Jump and duck</b><span>Jump over cacti and low pterodactyls. Duck under high pterodactyls. While airborne, duck to land faster.</span></li>
+        <li><b>Reach the finish</b><span>You have three lives. A hit costs one and slows you down. The first runner to 1,500 meters wins; if time expires, the farthest runner wins.</span></li>
+      </ol>
+      <div class="key-guide"><span><kbd>SPACE</kbd> <kbd>↑</kbd> or <kbd>W</kbd> jump</span><span><kbd>↓</kbd> or <kbd>S</kbd> duck</span></div>
+      <p>On a phone, use the on-screen buttons. You can practice by creating a room and starting alone. Late joiners spectate until the next race.</p>
+    </dialog>
+
+    <footer id="home-footer"><span>A little race with your favorite offline runner.</span><span>No accounts · No downloads</span></footer>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
