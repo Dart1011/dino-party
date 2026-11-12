@@ -369,7 +369,7 @@ function handleRaceEvents(events) {
     if (event.id !== room.localId) continue;
     if (event.type === 'hit') toast('Ouch! One life used.');
     if (event.type === 'pickup') toast(`${POWERUPS[event.powerup].name} ready! Press E / Shift or tap POWER.`);
-    if (event.type === 'attack-hit') toast(`${POWERUPS[event.powerup].name} hit! You’re slowed briefly.`);
+    if (event.type === 'attack-hit') toast(`${POWERUPS[event.powerup].name} hit! You lost a life.`);
     if (event.type === 'shield-block') toast('Shield blocked the hit!');
     if (event.type === 'powerup-used' && event.powerup === 'repair') toast('Repair complete!');
     if (event.type === 'out') toast('You’re out. Watch your crew run!');

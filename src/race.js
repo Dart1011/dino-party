@@ -15,6 +15,7 @@ export class Race {
     this.events = [];
     this.inputs = new Map();
     this.collected = new Set();
+    this.destroyed = new Set();
     this.projectiles = [];
     this.mines = [];
     this.nextEntityId = 1;
@@ -86,6 +87,7 @@ export class Race {
       });
     }
     if (type === 'barge') {
+      this.destroyObstaclesInRadius(player.distance, player.y, 340, 155, player.id, type);
       for (const target of this.players.values()) {
         if (target.id === player.id) continue;
         if (Math.abs(target.distance - player.distance) <= 340 && Math.abs(target.y - player.y) <= 155) {
@@ -139,6 +141,7 @@ export class Race {
       this.movePlayer(player, input, dt);
       this.collectPowerups(player);
       this.checkCollisions(player);
+      if (player.boostTime > 0) this.checkRamming(player);
     }
 
     this.updateProjectiles(dt);
@@ -214,6 +217,12 @@ export class Race {
       }
       projectile.x += projectile.speed * dt;
       if (projectile.life <= 0) continue;
+      const obstacle = this.projectileObstacle(projectile);
+      if (obstacle) {
+        this.destroyObstacle(obstacle, projectile.ownerId, projectile.type);
+        projectile.life = 0;
+        continue;
+      }
       for (const player of this.players.values()) {
         if (player.id === projectile.ownerId || player.out || player.immuneTime > 0) continue;
         if (Math.abs(player.distance - projectile.x) > 31 || Math.abs(player.y + 29 - projectile.y) > 45) continue;
@@ -225,19 +234,70 @@ export class Race {
     this.projectiles = this.projectiles.filter(projectile => projectile.life > 0);
   }
 
+  projectileObstacle(projectile) {
+    for (const obstacle of this.course.obstacles) {
+      if (obstacle.x - projectile.x > 80) break;
+      if (obstacle.x < projectile.x - 80 || this.destroyed.has(obstacle.id)) continue;
+      const box = obstacleBounds(obstacle);
+      if (projectile.x + 11 <= box.left || projectile.x - 11 >= box.right || projectile.y + 16 <= box.bottom || projectile.y - 16 >= box.top) continue;
+      return obstacle;
+    }
+    return null;
+  }
+
+  obstaclesInRadius(x, y, radius, vertical) {
+    const obstacles = [];
+    for (const obstacle of this.course.obstacles) {
+      if (obstacle.x - x > radius) break;
+      if (obstacle.x < x - radius || this.destroyed.has(obstacle.id)) continue;
+      const box = obstacleBounds(obstacle);
+      if (Math.abs(box.centerY - y) <= vertical) obstacles.push(obstacle);
+    }
+    return obstacles;
+  }
+
+  destroyObstaclesInRadius(x, y, radius, vertical, sourceId, powerup) {
+    const obstacles = this.obstaclesInRadius(x, y, radius, vertical);
+    for (const obstacle of obstacles) this.destroyObstacle(obstacle, sourceId, powerup);
+    return obstacles.length;
+  }
+
+  destroyObstacle(obstacle, sourceId, powerup) {
+    if (this.destroyed.has(obstacle.id)) return;
+    this.destroyed.add(obstacle.id);
+    const size = obstacleSize(obstacle.type);
+    this.events.push({
+      type: 'obstacle-break',
+      id: sourceId,
+      obstacle: obstacle.id,
+      obstacleType: obstacle.type,
+      x: obstacle.x,
+      y: (obstacle.y || 0) + size.y + size.height / 2,
+      powerup,
+    });
+  }
+
   updateMines(dt) {
     for (const mine of this.mines) {
       mine.life -= dt;
       mine.arm = Math.max(0, mine.arm - dt);
       if (mine.arm > 0 || mine.life <= 0) continue;
-      for (const player of this.players.values()) {
-        if (player.id === mine.ownerId || player.out || player.immuneTime > 0) continue;
-        if (Math.abs(player.distance - mine.x) > 32 || Math.abs(player.y - mine.y) > 60) continue;
-        if (this.attack(player, mine.ownerId, 'mine')) mine.life = 0;
-        break;
-      }
+      const obstacleTriggered = this.obstaclesInRadius(mine.x, mine.y, 65, 85).length > 0;
+      const playerTriggered = [...this.players.values()].some(player => player.id !== mine.ownerId && !player.out && player.immuneTime <= 0
+        && Math.abs(player.distance - mine.x) <= 32 && Math.abs(player.y - mine.y) <= 60);
+      if (obstacleTriggered || playerTriggered) this.explodeMine(mine);
     }
     this.mines = this.mines.filter(mine => mine.life > 0);
+  }
+
+  explodeMine(mine) {
+    this.destroyObstaclesInRadius(mine.x, mine.y, 95, 105, mine.ownerId, 'mine');
+    for (const player of this.players.values()) {
+      if (player.id === mine.ownerId || player.out) continue;
+      if (Math.abs(player.distance - mine.x) <= 90 && Math.abs(player.y - mine.y) <= 75) this.attack(player, mine.ownerId, 'mine');
+    }
+    this.events.push({ type: 'explosion', id: mine.ownerId, x: mine.x, y: mine.y, powerup: 'mine' });
+    mine.life = 0;
   }
 
   attack(player, sourceId, powerup) {
@@ -248,21 +308,38 @@ export class Race {
       this.events.push({ type: 'shield-block', id: player.id, sourceId, powerup });
       return true;
     }
+    player.lives -= 1;
     player.stunTime = Math.max(player.stunTime, powerup === 'mine' ? 0.85 : 0.65);
     player.immuneTime = 1.3;
     player.speed = Math.min(player.speed, 170);
-    if (powerup === 'barge') player.distance = Math.max(0, player.distance - 45);
+    player.boostTime = 0;
+    if (powerup === 'barge' || powerup === 'nitro') player.distance = Math.max(0, player.distance - 45);
     if (powerup === 'mine') {
       player.grounded = false;
       player.vy = 390;
       player.jumpsUsed = Math.max(1, player.jumpsUsed);
     }
-    this.events.push({ type: 'attack-hit', id: player.id, sourceId, powerup });
+    this.events.push({ type: 'attack-hit', id: player.id, sourceId, powerup, lives: Math.max(0, player.lives) });
+    if (player.lives <= 0) {
+      player.out = true;
+      player.speed = 0;
+      player.ducking = false;
+      this.events.push({ type: 'out', id: player.id, sourceId, powerup });
+    }
     return true;
   }
 
+  checkRamming(player) {
+    for (const target of this.players.values()) {
+      if (target.id === player.id || target.out) continue;
+      if (Math.abs(target.distance - player.distance) <= 35 && Math.abs(target.y - player.y) <= 60) {
+        this.attack(target, player.id, 'nitro');
+      }
+    }
+  }
+
   checkCollisions(player) {
-    if (player.immuneTime > 0 || player.stunTime > 0) return;
+    if ((player.immuneTime > 0 || player.stunTime > 0) && player.boostTime <= 0) return;
     const playerBox = {
       left: player.distance - (player.ducking ? 29 : 20),
       right: player.distance + (player.ducking ? 29 : 20),
@@ -272,15 +349,13 @@ export class Race {
     for (const obstacle of this.course.obstacles) {
       const dx = obstacle.x - player.distance;
       if (dx > 80) break;
-      if (dx < -80) continue;
-      const size = obstacleSize(obstacle.type);
-      const obstacleBox = {
-        left: obstacle.x - size.width / 2 + 4,
-        right: obstacle.x + size.width / 2 - 4,
-        bottom: (obstacle.y || 0) + size.y + 3,
-        top: (obstacle.y || 0) + size.y + size.height - 3,
-      };
+      if (dx < -80 || this.destroyed.has(obstacle.id)) continue;
+      const obstacleBox = obstacleBounds(obstacle);
       if (playerBox.right <= obstacleBox.left || playerBox.left >= obstacleBox.right || playerBox.top <= obstacleBox.bottom || playerBox.bottom >= obstacleBox.top) continue;
+      if (player.boostTime > 0) {
+        this.destroyObstacle(obstacle, player.id, 'nitro');
+        continue;
+      }
       if (player.shieldTime > 0) {
         player.shieldTime = 0;
         player.immuneTime = 1;
@@ -317,6 +392,7 @@ export class Race {
       time: round(this.time),
       ended: this.ended,
       collected: [...this.collected],
+      destroyed: [...this.destroyed],
       projectiles: this.projectiles.map(projectile => ({
         ...projectile,
         x: round(projectile.x),
@@ -339,6 +415,17 @@ export class Race {
       })),
     };
   }
+}
+
+function obstacleBounds(obstacle) {
+  const size = obstacleSize(obstacle.type);
+  return {
+    left: obstacle.x - size.width / 2 + 4,
+    right: obstacle.x + size.width / 2 - 4,
+    bottom: (obstacle.y || 0) + size.y + 3,
+    top: (obstacle.y || 0) + size.y + size.height - 3,
+    centerY: (obstacle.y || 0) + size.y + size.height / 2,
+  };
 }
 
 export function comparePlayers(a, b) {

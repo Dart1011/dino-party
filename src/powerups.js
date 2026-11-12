@@ -1,10 +1,10 @@
 export const POWERUPS = Object.freeze({
-  nitro: { name: 'NITRO', color: '#f4c44e', ink: '#a47400', description: 'A 2.5-second speed burst.' },
+  nitro: { name: 'NITRO', color: '#f4c44e', ink: '#a47400', description: 'Speed boost that smashes obstacles and rams rivals for one life.' },
   shield: { name: 'SHIELD', color: '#67c9d4', ink: '#257582', description: 'Blocks one obstacle or attack for up to 8 seconds.' },
-  bolt: { name: 'BOLT ×3', color: '#8fc7ff', ink: '#4279b9', description: 'Fire three quick shots at rivals ahead.' },
-  shunt: { name: 'SHUNT', color: '#c49af4', ink: '#7b49ad', description: 'Launch a persistent homing orb.' },
-  mine: { name: 'MINE', color: '#ef7865', ink: '#b74436', description: 'Leave an explosive surprise behind you.' },
-  barge: { name: 'BARGE', color: '#f29e59', ink: '#aa5a1d', description: 'Blast nearby rivals in both directions.' },
+  bolt: { name: 'BOLT ×3', color: '#8fc7ff', ink: '#4279b9', description: 'Three shots that destroy hazards and cost rivals one life.' },
+  shunt: { name: 'SHUNT', color: '#c49af4', ink: '#7b49ad', description: 'A homing orb that destroys hazards and costs rivals one life.' },
+  mine: { name: 'MINE', color: '#ef7865', ink: '#b74436', description: 'Explodes hazards and rivals for one life of damage.' },
+  barge: { name: 'BARGE', color: '#f29e59', ink: '#aa5a1d', description: 'Blast hazards and nearby rivals for one life of damage.' },
   repair: { name: 'REPAIR', color: '#83c995', ink: '#357548', description: 'Restore a life, or gain a shield at full health.' },
 });
 

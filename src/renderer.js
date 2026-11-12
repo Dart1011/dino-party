@@ -154,11 +154,12 @@ export class Renderer {
       if (!collected.has(pickup.id)) drawPickup(ctx, pickup, x, ground, scale, now / 1000);
     }
 
+    const destroyed = new Set(snapshot.destroyed || []);
     for (const obstacle of this.course.obstacles) {
       const x = anchor + (obstacle.x - camera.distance) * scale;
       if (x < -100) continue;
       if (x > this.width + 100) break;
-      drawObstacle(ctx, obstacle, x, ground - (obstacle.y || 0) * scale, scale, now / 1000, scene.theme);
+      if (!destroyed.has(obstacle.id)) drawObstacle(ctx, obstacle, x, ground - (obstacle.y || 0) * scale, scale, now / 1000, scene.theme);
     }
 
     for (const mine of snapshot.mines || []) {

@@ -32,6 +32,25 @@ export class Effects {
     if (!snapshot) return;
     const now = performance.now();
     for (const event of events) {
+      if (event.type === 'obstacle-break') {
+        const obstacle = { id: event.id, distance: event.x, y: event.y };
+        const theme = sceneForDistance(event.x).theme;
+        this.debris(obstacle, 0, theme, event.obstacleType);
+        this.text(obstacle, 0, event.obstacleType.startsWith('bird') ? 'BIRD DOWN!' : 'SMASH!', POWERUPS[event.powerup].color);
+        this.wave(obstacle, 0, POWERUPS[event.powerup].color, 75, 0.4);
+        if (event.id === localId) {
+          this.shakeUntil = now + 110;
+          this.shakeDuration = 110;
+          this.shakeStrength = 3;
+        }
+        continue;
+      }
+      if (event.type === 'explosion') {
+        const blast = { distance: event.x, y: event.y };
+        this.wave(blast, 0, POWERUPS[event.powerup].color, 145, 0.55);
+        this.text(blast, 0, 'BOOM!', POWERUPS[event.powerup].color);
+        continue;
+      }
       const player = snapshot.players.find(candidate => candidate.id === event.id);
       if (!player) continue;
       const lane = this.laneFor(player, snapshot);
@@ -63,7 +82,7 @@ export class Effects {
       if (event.type === 'attack-hit') {
         this.hitAt.set(player.id, now);
         this.debris(player, lane, theme);
-        this.text(player, lane, 'SLOWED!', POWERUPS[event.powerup].color);
+        this.text(player, lane, '-1 LIFE', POWERUPS[event.powerup].color);
         this.wave(player, lane, POWERUPS[event.powerup].color, event.powerup === 'mine' ? 125 : 65, 0.45);
         if (player.id === localId) {
           this.shakeUntil = now + 200;
@@ -154,11 +173,12 @@ export class Effects {
     }
   }
 
-  debris(player, lane, theme) {
+  debris(player, lane, theme, obstacleType = 'cactus') {
+    const colors = obstacleType.startsWith('bird') ? [theme.bird, theme.cloud, theme.ink] : [theme.cactus, theme.cactusLight, theme.ink];
     for (let index = 0; index < 8; index += 1) {
       const life = 0.55 + Math.random() * 0.4;
       this.particles.push({
-        kind: 'debris', color: [theme.cactus, theme.cactusLight, theme.ink][index % 3],
+        kind: 'debris', color: colors[index % 3],
         x: player.distance + 12, y: player.y + 25,
         vx: -100 + Math.random() * 200, vy: 80 + Math.random() * 150,
         gravity: 390, life, maxLife: life, size: 4 + Math.random() * 5,
