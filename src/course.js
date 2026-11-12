@@ -29,7 +29,7 @@ export class Course {
 
   ensure(distance) {
     const pickupCount = this.powerups.length;
-    while (this.nextPlatformX < distance + 220) this.addPlatform();
+    while (this.nextPlatformX < distance) this.addPlatform();
     while (this.nextX < distance + 120) {
       const x = this.nextX;
       const roll = this.nextObstacle();
@@ -38,13 +38,13 @@ export class Course {
       else if (roll > 0.52) type = 'cactus-group';
       else if (roll > 0.24) type = 'cactus-large';
       else type = 'cactus-small';
-      if (!this.onRamp(x)) this.obstacles.push({ id: this.nextObstacleId++, type, x: Math.round(x), y: 0 });
+      this.obstacles.push({ id: this.nextObstacleId++, type, x: Math.round(x), y: 0 });
       const difficulty = Math.min(1, x / 40000);
       this.nextX += 430 + this.nextObstacle() * 280 + difficulty * 170;
     }
     while (this.nextPowerupX < distance) {
       const x = this.nextPowerupX;
-      if (!this.onRamp(x, 90) && !this.obstacles.some(obstacle => Math.abs(obstacle.x - x) < 85)) {
+      if (!this.obstacles.some(obstacle => Math.abs(obstacle.x - x) < 85)) {
         this.powerups.push({
           id: `p${this.nextPickupId++}`,
           x: Math.round(x),
@@ -59,49 +59,32 @@ export class Course {
 
   addPlatform() {
     const x = this.nextPlatformX;
-    const floating = this.nextPlatform() > 0.66;
-    const height = floating ? 190 + Math.floor(this.nextPlatform() * 2) * 15 : 115 + Math.floor(this.nextPlatform() * 3) * 10;
-    const ramp = floating ? 0 : 190;
-    const flat = floating ? 360 + this.nextPlatform() * 170 : 430 + this.nextPlatform() * 240;
+    const high = this.nextPlatform() > 0.6;
+    const height = high ? 190 + Math.floor(this.nextPlatform() * 2) * 15 : 115 + Math.floor(this.nextPlatform() * 3) * 10;
+    const length = Math.round(1100 + this.nextPlatform() * 450);
     const platform = {
       id: `r${this.nextPlatformId++}`,
       x: Math.round(x),
       height,
-      ramp,
-      flat: Math.round(flat),
-      length: Math.round(ramp * 2 + flat),
-      floating,
-      entry: floating ? 0 : 22,
+      length,
     };
     this.platforms.push(platform);
     this.powerups.push({
       id: `${platform.id}-powerup`,
-      x: Math.round(platform.x + ramp + flat * 0.5),
+      x: Math.round(platform.x + length * 0.5),
       y: height + 43,
       type: this.powerupType(this.nextPlatform),
       platformId: platform.id,
     });
-    this.nextPlatformX += platform.length + 1250 + this.nextPlatform() * 900;
+    this.nextPlatformX += platform.length + 1200 + this.nextPlatform() * 800;
   }
 
   powerupType(next = this.nextPowerup) {
     return POWERUP_TYPES[Math.floor(next() * POWERUP_TYPES.length)];
   }
 
-  onRamp(x, padding = 70) {
-    return this.platforms.some(platform => platform.ramp > 0 && (
-      (x >= platform.x - padding && x <= platform.x + platform.ramp + padding)
-      || (x >= platform.x + platform.ramp + platform.flat - padding && x <= platform.x + platform.length + padding)
-    ));
-  }
-
   platformHeight(platform, x) {
-    const local = x - platform.x;
-    if (local < 0 || local > platform.length) return null;
-    if (!platform.ramp) return platform.height;
-    if (local < platform.ramp) return platform.entry + (platform.height - platform.entry) * local / platform.ramp;
-    if (local <= platform.ramp + platform.flat) return platform.height;
-    return platform.entry + (platform.height - platform.entry) * (1 - (local - platform.ramp - platform.flat) / platform.ramp);
+    return x >= platform.x && x <= platform.x + platform.length ? platform.height : null;
   }
 
   surfacesAt(x) {

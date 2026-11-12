@@ -527,61 +527,34 @@ function drawPartyHat(ctx, x, y, tilt, ink) {
 }
 
 function drawPlatform(ctx, platform, x, ground, scale, theme) {
-  const points = platform.floating
-    ? [[0, platform.height], [platform.length, platform.height]]
-    : [
-      [0, platform.entry],
-      [platform.ramp, platform.height],
-      [platform.ramp + platform.flat, platform.height],
-      [platform.length, platform.entry],
-    ];
-  const depth = platform.floating ? 30 : 20;
+  const depth = 30;
+  const top = ground - platform.height * scale;
+  const bottom = top + depth * scale;
+  const width = platform.length * scale;
   ctx.save();
-  ctx.beginPath();
-  points.forEach(([local, height], index) => {
-    const px = x + local * scale;
-    const py = ground - height * scale;
-    if (index === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  });
-  for (let index = points.length - 1; index >= 0; index -= 1) {
-    const [local, height] = points[index];
-    ctx.lineTo(x + local * scale, ground - Math.max(0, height - depth) * scale);
-  }
-  ctx.closePath();
   ctx.fillStyle = theme.platform;
-  ctx.fill();
+  ctx.fillRect(Math.round(x), Math.round(top), Math.round(width), Math.round(depth * scale));
   ctx.strokeStyle = theme.ink;
   ctx.lineWidth = Math.max(1.5, 2 * scale);
-  ctx.stroke();
-
+  ctx.strokeRect(Math.round(x), Math.round(top), Math.round(width), Math.round(depth * scale));
   ctx.beginPath();
-  points.forEach(([local, height], index) => {
-    const px = x + local * scale;
-    const py = ground - height * scale;
-    if (index === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  });
+  ctx.moveTo(x, top);
+  ctx.lineTo(x + width, top);
   ctx.strokeStyle = theme.platformTop;
   ctx.lineWidth = Math.max(3, 6 * scale);
   ctx.stroke();
 
   ctx.fillStyle = theme.platformDetail;
-  const start = platform.floating ? 24 : platform.ramp + 24;
-  const end = platform.length - (platform.floating ? 20 : platform.ramp + 20);
-  for (let local = start; local < end; local += 72) {
-    const height = platform.floating ? platform.height - 13 : platform.height - 10;
-    ctx.fillRect(Math.round(x + local * scale), Math.round(ground - height * scale), Math.max(2, Math.round(3 * scale)), Math.max(3, Math.round(9 * scale)));
-    if (platform.floating) {
-      ctx.beginPath();
-      ctx.moveTo(x + (local - 8) * scale, ground - (platform.height - depth) * scale);
-      ctx.lineTo(x + (local + 5) * scale, ground - (platform.height - depth - 10) * scale);
-      ctx.lineTo(x + (local + 17) * scale, ground - (platform.height - depth) * scale);
-      ctx.fill();
-    }
+  for (let local = 24; local < platform.length - 20; local += 72) {
+    ctx.fillRect(Math.round(x + local * scale), Math.round(top + 12 * scale), Math.max(2, Math.round(3 * scale)), Math.max(3, Math.round(9 * scale)));
+    ctx.beginPath();
+    ctx.moveTo(x + (local - 8) * scale, bottom);
+    ctx.lineTo(x + (local + 5) * scale, bottom + 10 * scale);
+    ctx.lineTo(x + (local + 17) * scale, bottom);
+    ctx.fill();
   }
 
-  const label = platform.floating ? 'DOUBLE JUMP ↑' : '↑ UPPER ROUTE';
+  const label = platform.height >= 170 ? 'DOUBLE JUMP ↑' : '↑ LONG PLATFORM';
   ctx.font = `700 ${Math.max(7, Math.round(8 * scale))}px Silkscreen, monospace`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';

@@ -1,5 +1,5 @@
 export const MAX_PLAYERS = 8;
-export const ROOM_PREFIX = 'dino-party-v4-';
+export const ROOM_PREFIX = 'dino-party-v5-';
 export const CHARACTERS = 6;
 
 export function cleanName(value) {
