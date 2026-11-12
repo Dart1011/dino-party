@@ -1,4 +1,5 @@
 import { sceneForDistance } from './scene.js';
+import { POWERUPS } from './powerups.js';
 
 const CONFETTI = ['#f4c44e', '#e86f4c', '#73a98b', '#78a7d8', '#b18bd4', '#fff3cf'];
 
@@ -10,6 +11,8 @@ export class Effects {
   reset() {
     this.particles = [];
     this.texts = [];
+    this.waves = [];
+    this.boostAt = new Map();
     this.landAt = new Map();
     this.hitAt = new Map();
     this.footsteps = new Map();
@@ -34,9 +37,39 @@ export class Effects {
       const lane = this.laneFor(player, snapshot);
       const theme = sceneForDistance(player.distance).theme;
       if (event.type === 'jump') this.dust(player, lane, theme, 6, 1.2);
+      if (event.type === 'double-jump') {
+        this.wave(player, lane, '#fff3cf', 66, 0.35);
+        this.dust(player, lane, theme, 8, 1.3);
+      }
+      if (event.type === 'drop') this.dust(player, lane, theme, 5, 0.8);
       if (event.type === 'land') {
         this.landAt.set(player.id, now);
         this.dust(player, lane, theme, 12, 1.8);
+      }
+      if (event.type === 'pickup') {
+        this.confetti(player, lane);
+        this.text(player, lane, POWERUPS[event.powerup].name, POWERUPS[event.powerup].color);
+        this.wave(player, lane, POWERUPS[event.powerup].color, 85, 0.45);
+      }
+      if (event.type === 'powerup-used') {
+        const color = POWERUPS[event.powerup].color;
+        this.text(player, lane, event.powerup === 'repair' ? 'REPAIRED!' : `${POWERUPS[event.powerup].name}!`, color);
+        this.wave(player, lane, color, event.powerup === 'barge' ? 340 : 80, event.powerup === 'barge' ? 0.6 : 0.4);
+      }
+      if (event.type === 'shield-block') {
+        this.text(player, lane, 'BLOCKED!', POWERUPS.shield.color);
+        this.wave(player, lane, POWERUPS.shield.color, 100, 0.5);
+      }
+      if (event.type === 'attack-hit') {
+        this.hitAt.set(player.id, now);
+        this.debris(player, lane, theme);
+        this.text(player, lane, 'SLOWED!', POWERUPS[event.powerup].color);
+        this.wave(player, lane, POWERUPS[event.powerup].color, event.powerup === 'mine' ? 125 : 65, 0.45);
+        if (player.id === localId) {
+          this.shakeUntil = now + 200;
+          this.shakeDuration = 200;
+          this.shakeStrength = 5;
+        }
       }
       if (event.type === 'hit') {
         this.hitAt.set(player.id, now);
@@ -68,6 +101,8 @@ export class Effects {
       text.y += text.vy * dt;
     }
     this.texts = this.texts.filter(text => text.life > 0);
+    for (const wave of this.waves) wave.life -= dt;
+    this.waves = this.waves.filter(wave => wave.life > 0);
 
     const local = snapshot.players.find(player => player.id === this.localId);
     if (local && !local.out) {
@@ -85,6 +120,17 @@ export class Effects {
         this.footsteps.set(player.id, step);
         this.dust(player, this.laneFor(player, snapshot), sceneForDistance(player.distance).theme, 2, 0.6);
       }
+      if (!player.out && player.boostTime > 0 && now - (this.boostAt.get(player.id) || 0) > 38) {
+        this.boostAt.set(player.id, now);
+        const life = 0.22 + Math.random() * 0.2;
+        this.particles.push({
+          kind: 'spark', color: Math.random() > 0.4 ? '#f4c44e' : '#fff3cf',
+          x: player.distance - 25, y: player.y + 12 + Math.random() * 38,
+          vx: -170 - Math.random() * 130, vy: (Math.random() - 0.5) * 45,
+          gravity: 0, life, maxLife: life, size: 3 + Math.random() * 5,
+          lane: this.laneFor(player, snapshot), rotation: 0, spin: 0,
+        });
+      }
     }
   }
 
@@ -100,7 +146,7 @@ export class Effects {
       const life = 0.35 + Math.random() * 0.35;
       this.particles.push({
         kind: 'dust', color: theme.dust,
-        x: player.distance - 15 + Math.random() * 20, y: 2 + Math.random() * 7,
+        x: player.distance - 15 + Math.random() * 20, y: player.y + 2 + Math.random() * 7,
         vx: (-25 - Math.random() * 65) * force, vy: (15 + Math.random() * 40) * force,
         gravity: 75, life, maxLife: life, size: 3 + Math.random() * 6,
         lane, rotation: 0, spin: 0,
@@ -134,6 +180,10 @@ export class Effects {
     }
   }
 
+  wave(player, lane, color, radius, duration) {
+    this.waves.push({ x: player.distance, y: player.y + 32, lane, color, radius, life: duration, maxLife: duration });
+  }
+
   text(player, lane, value, color) {
     this.texts.push({ x: player.distance, y: player.y + 125, vy: 42, life: 1.15, maxLife: 1.15, value, color, lane });
   }
@@ -157,6 +207,17 @@ export class Effects {
         ctx.fillRect(-size / 2, -size / 2, size, particle.kind === 'confetti' ? size * 0.55 : size);
         ctx.restore();
       }
+    }
+    for (const wave of this.waves) {
+      const progress = 1 - wave.life / wave.maxLife;
+      const x = anchor + (wave.x - camera.distance) * scale + wave.lane;
+      const y = ground - wave.y * scale;
+      ctx.globalAlpha = (1 - progress) * 0.8;
+      ctx.strokeStyle = wave.color;
+      ctx.lineWidth = Math.max(1, (1 - progress) * 6 * scale);
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(1, wave.radius * progress * scale), 0, Math.PI * 2);
+      ctx.stroke();
     }
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

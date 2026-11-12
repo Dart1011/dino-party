@@ -38,7 +38,7 @@ export class Controls {
   key(event, pressed) {
     const target = event.target;
     if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || (!this.enabled && target instanceof HTMLButtonElement)) return;
-    const supported = ['ArrowUp', 'ArrowDown', ' ', 'w', 's', 'W', 'S'];
+    const supported = ['ArrowUp', 'ArrowDown', ' ', 'w', 's', 'W', 'S', 'e', 'E', 'Shift', 'x', 'X'];
     if (!supported.includes(event.key)) return;
     if (this.enabled) event.preventDefault();
     if (pressed) this.keys.add(event.key.toLowerCase());
@@ -51,6 +51,7 @@ export class Controls {
     const next = sanitizeInput({
       jump: this.keys.has('arrowup') || this.keys.has('w') || this.keys.has(' ') || held('jump'),
       duck: this.keys.has('arrowdown') || this.keys.has('s') || held('duck'),
+      use: this.keys.has('e') || this.keys.has('shift') || this.keys.has('x') || held('use'),
     });
     if (JSON.stringify(next) === JSON.stringify(this.state)) return;
     this.state = next;

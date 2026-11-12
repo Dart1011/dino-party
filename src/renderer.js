@@ -1,6 +1,7 @@
 import { Course, obstacleSize } from './course.js';
 import { Effects } from './effects.js';
 import { playerColor } from './protocol.js';
+import { drawPowerupIcon, POWERUPS } from './powerups.js';
 import { DAY, sceneForDistance } from './scene.js';
 
 const SID_FRAME_SIZE = 512;
@@ -84,7 +85,15 @@ export class Renderer {
         y: previous.y + (player.y - previous.y) * alpha,
       };
     });
-    return { ...this.current, players };
+    const projectiles = (this.current.projectiles || []).map(projectile => {
+      const previous = this.previous?.projectiles?.find(candidate => candidate.id === projectile.id) || projectile;
+      return {
+        ...projectile,
+        x: previous.x + (projectile.x - previous.x) * alpha,
+        y: previous.y + (projectile.y - previous.y) * alpha,
+      };
+    });
+    return { ...this.current, players, projectiles };
   }
 
   drawIdle(time, players) {
@@ -130,11 +139,36 @@ export class Renderer {
     ctx.translate(shake.x, shake.y);
     this.drawEnvironment(camera.distance, now / 1000, ground, scene.theme, scene.nightAmount);
 
+    for (const platform of this.course.platforms) {
+      const x = anchor + (platform.x - camera.distance) * scale;
+      if (x + platform.length * scale < -100) continue;
+      if (x > this.width + 100) break;
+      drawPlatform(ctx, platform, x, ground, scale, scene.theme);
+    }
+
+    const collected = new Set(snapshot.collected || []);
+    for (const pickup of this.course.powerups) {
+      const x = anchor + (pickup.x - camera.distance) * scale;
+      if (x < -60) continue;
+      if (x > this.width + 60) break;
+      if (!collected.has(pickup.id)) drawPickup(ctx, pickup, x, ground, scale, now / 1000);
+    }
+
     for (const obstacle of this.course.obstacles) {
       const x = anchor + (obstacle.x - camera.distance) * scale;
       if (x < -100) continue;
       if (x > this.width + 100) break;
-      drawObstacle(ctx, obstacle, x, ground, scale, now / 1000, scene.theme);
+      drawObstacle(ctx, obstacle, x, ground - (obstacle.y || 0) * scale, scale, now / 1000, scene.theme);
+    }
+
+    for (const mine of snapshot.mines || []) {
+      const x = anchor + (mine.x - camera.distance) * scale;
+      const y = ground - mine.y * scale;
+      drawShadow(ctx, x, y, 17, scale, scene.theme, 0.22);
+      drawPowerupIcon(ctx, 'mine', x, y - 10 * scale, 30 * scale, now / 1000);
+    }
+    for (const projectile of snapshot.projectiles || []) {
+      drawProjectile(ctx, projectile, anchor + (projectile.x - camera.distance) * scale, ground - projectile.y * scale, scale, now / 1000);
     }
 
     const ordered = [...snapshot.players].sort((a, b) => Number(a.id === this.localId) - Number(b.id === this.localId));
@@ -144,8 +178,9 @@ export class Renderer {
       const x = anchor + (player.distance - camera.distance) * scale + laneOffset;
       if (x < -100 || x > this.width + 100) continue;
       const y = ground - player.y * scale;
-      const shadowScale = 1 - Math.min(0.5, player.y / 300);
-      drawShadow(ctx, x, ground, 43 * shadowScale, scale, scene.theme, 0.24 * shadowScale);
+      const support = this.course.surfaceAt(player.distance, player.y + 1);
+      const shadowScale = 1 - Math.min(0.5, Math.max(0, player.y - support) / 300);
+      drawShadow(ctx, x, ground - support * scale, 43 * shadowScale, scale, scene.theme, 0.24 * shadowScale);
 
       const landingAge = (now - (this.effects.landAt.get(player.id) || -1000)) / 190;
       const hitAge = (now - (this.effects.hitAt.get(player.id) || -1000)) / 280;
@@ -178,6 +213,7 @@ export class Renderer {
         hatTilt: Math.sin(player.distance / 75) * 0.08 + player.vy / 850 * 0.1,
       });
       ctx.globalAlpha = 1;
+      if (player.shieldTime > 0 && !player.out) drawShield(ctx, x, y - 35 * scale, scale, now / 1000, player.shieldTime);
       this.drawNameTag(player, x, y, scale, playerIndex % 2 * 13, scene.theme);
     }
 
@@ -486,6 +522,145 @@ function drawPartyHat(ctx, x, y, tilt, ink) {
   ctx.beginPath();
   ctx.arc(0, -19, 3, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+function drawPlatform(ctx, platform, x, ground, scale, theme) {
+  const points = platform.floating
+    ? [[0, platform.height], [platform.length, platform.height]]
+    : [
+      [0, platform.entry],
+      [platform.ramp, platform.height],
+      [platform.ramp + platform.flat, platform.height],
+      [platform.length, platform.entry],
+    ];
+  const depth = platform.floating ? 30 : 20;
+  ctx.save();
+  ctx.beginPath();
+  points.forEach(([local, height], index) => {
+    const px = x + local * scale;
+    const py = ground - height * scale;
+    if (index === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  });
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    const [local, height] = points[index];
+    ctx.lineTo(x + local * scale, ground - Math.max(0, height - depth) * scale);
+  }
+  ctx.closePath();
+  ctx.fillStyle = theme.platform;
+  ctx.fill();
+  ctx.strokeStyle = theme.ink;
+  ctx.lineWidth = Math.max(1.5, 2 * scale);
+  ctx.stroke();
+
+  ctx.beginPath();
+  points.forEach(([local, height], index) => {
+    const px = x + local * scale;
+    const py = ground - height * scale;
+    if (index === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  });
+  ctx.strokeStyle = theme.platformTop;
+  ctx.lineWidth = Math.max(3, 6 * scale);
+  ctx.stroke();
+
+  ctx.fillStyle = theme.platformDetail;
+  const start = platform.floating ? 24 : platform.ramp + 24;
+  const end = platform.length - (platform.floating ? 20 : platform.ramp + 20);
+  for (let local = start; local < end; local += 72) {
+    const height = platform.floating ? platform.height - 13 : platform.height - 10;
+    ctx.fillRect(Math.round(x + local * scale), Math.round(ground - height * scale), Math.max(2, Math.round(3 * scale)), Math.max(3, Math.round(9 * scale)));
+    if (platform.floating) {
+      ctx.beginPath();
+      ctx.moveTo(x + (local - 8) * scale, ground - (platform.height - depth) * scale);
+      ctx.lineTo(x + (local + 5) * scale, ground - (platform.height - depth - 10) * scale);
+      ctx.lineTo(x + (local + 17) * scale, ground - (platform.height - depth) * scale);
+      ctx.fill();
+    }
+  }
+
+  const label = platform.floating ? 'DOUBLE JUMP ↑' : '↑ UPPER ROUTE';
+  ctx.font = `700 ${Math.max(7, Math.round(8 * scale))}px Silkscreen, monospace`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = theme.ink;
+  ctx.globalAlpha = 0.68;
+  ctx.fillText(label, x + 8 * scale, ground - 55 * scale);
+  ctx.restore();
+}
+
+function drawPickup(ctx, pickup, x, ground, scale, time) {
+  const y = ground - (pickup.y + Math.sin(time * 3.2 + pickup.x * 0.01) * 6) * scale;
+  const color = POWERUPS[pickup.type].color;
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 16 * scale;
+  ctx.fillStyle = 'rgba(255,253,247,0.94)';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(2, 3 * scale);
+  const radius = 22 * scale;
+  ctx.beginPath();
+  for (let index = 0; index < 8; index += 1) {
+    const angle = Math.PI / 8 + index * Math.PI / 4;
+    const px = Math.cos(angle) * radius;
+    const py = Math.sin(angle) * radius;
+    if (index === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  drawPowerupIcon(ctx, pickup.type, 0, 0, 29 * scale, time);
+  ctx.restore();
+}
+
+function drawProjectile(ctx, projectile, x, y, scale, time) {
+  const color = POWERUPS[projectile.type].color;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 13 * scale;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 5 * scale;
+  ctx.beginPath();
+  ctx.moveTo(x - 48 * scale, y);
+  ctx.lineTo(x - 9 * scale, y);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  if (projectile.type === 'bolt') {
+    drawPowerupIcon(ctx, 'bolt', x, y, 27 * scale, time);
+  } else {
+    ctx.beginPath();
+    ctx.arc(x, y, (9 + Math.sin(time * 14) * 1.5) * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fff3cf';
+    ctx.lineWidth = 2 * scale;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawShield(ctx, x, y, scale, time, remaining) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = POWERUPS.shield.color;
+  ctx.fillStyle = 'rgba(103,201,212,0.12)';
+  ctx.lineWidth = Math.max(1.5, 2 * scale);
+  ctx.globalAlpha = (remaining < 2 ? 0.4 + Math.sin(time * 16) * 0.25 : 0.75) + Math.sin(time * 5) * 0.08;
+  ctx.shadowColor = POWERUPS.shield.color;
+  ctx.shadowBlur = 10 * scale;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 40 * scale, 53 * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.globalAlpha = 0.8;
+  ctx.beginPath();
+  ctx.arc(0, 0, 45 * scale, time * 2, time * 2 + Math.PI * 0.4);
+  ctx.stroke();
   ctx.restore();
 }
 

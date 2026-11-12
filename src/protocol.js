@@ -1,5 +1,5 @@
 export const MAX_PLAYERS = 8;
-export const ROOM_PREFIX = 'dino-party-v2-';
+export const ROOM_PREFIX = 'dino-party-v3-';
 export const CHARACTERS = 6;
 
 export function cleanName(value) {
@@ -50,5 +50,6 @@ export function sanitizeInput(input) {
   return {
     jump: input?.jump === true,
     duck: input?.duck === true,
+    use: input?.use === true,
   };
 }

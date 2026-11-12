@@ -15,6 +15,9 @@ export const DAY = Object.freeze({
   cactus: '#56856c',
   cactusLight: '#74a184',
   bird: '#6d6687',
+  platform: '#9c8769',
+  platformTop: '#e3c384',
+  platformDetail: '#6f604e',
 });
 
 export const SUNSET = Object.freeze({
@@ -32,6 +35,9 @@ export const SUNSET = Object.freeze({
   cactus: '#596f62',
   cactusLight: '#7f8f72',
   bird: '#65566f',
+  platform: '#766477',
+  platformTop: '#d2a27f',
+  platformDetail: '#584d61',
 });
 
 export const NIGHT = Object.freeze({
@@ -49,6 +55,9 @@ export const NIGHT = Object.freeze({
   cactus: '#6f9c82',
   cactusLight: '#8ab494',
   bird: '#9a8fb5',
+  platform: '#3d4856',
+  platformTop: '#81929b',
+  platformDetail: '#252f3c',
 });
 
 function colorParts(color) {

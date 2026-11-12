@@ -4,6 +4,7 @@ import { cleanCharacter, cleanCode, cleanName, CHARACTERS, MAX_PLAYERS, playerCo
 import { comparePlayers, Race } from './race.js';
 import { sceneForDistance } from './scene.js';
 import { drawCharacterPreview, Renderer, sidAssetsReady } from './renderer.js';
+import { drawPowerupIcon, POWERUPS } from './powerups.js';
 
 const $ = id => document.getElementById(id);
 const screens = { home: $('home-screen'), lobby: $('lobby-screen'), results: $('results-screen') };
@@ -308,6 +309,7 @@ function updateHUD() {
     leaderboard.append(row);
   });
   $('player-stats').hidden = !local;
+  $('powerup-slot').hidden = !local;
   if (local) {
     const lives = document.createElement('span');
     lives.className = 'lives';
@@ -321,6 +323,24 @@ function updateHUD() {
     speed.className = 'speed-readout';
     speed.textContent = local.out ? 'OUT' : `${Math.round(local.speed / 5)} KM/H`;
     $('player-stats').replaceChildren(lives, speed);
+    if (local.boostTime > 0 || local.shieldTime > 0) {
+      const effect = document.createElement('span');
+      effect.className = `active-effect${local.boostTime > 0 ? ' boosting' : ''}`;
+      effect.textContent = local.boostTime > 0 ? `NITRO ${local.boostTime.toFixed(1)}s` : `SHIELD ${local.shieldTime.toFixed(1)}s`;
+      $('player-stats').append(effect);
+    }
+    const held = POWERUPS[local.powerup];
+    $('powerup-slot').classList.toggle('empty', !held);
+    $('powerup-slot').hidden = local.out;
+    $('powerup-name').textContent = held?.name || 'FIND A CAPSULE';
+    $('powerup-name').style.color = held?.ink || '';
+    $('powerup-slot').title = held?.description || 'Run through a capsule to collect a power-up.';
+    const powerButton = document.querySelector('[data-control="use"]');
+    powerButton.disabled = !held || local.out;
+    powerButton.setAttribute('aria-label', held ? `Use ${held.name}` : 'No power-up collected');
+    const icon = $('powerup-icon').getContext('2d');
+    icon.clearRect(0, 0, 56, 56);
+    if (held) drawPowerupIcon(icon, local.powerup, 28, 28, 39, performance.now() / 1000);
   }
 }
 
@@ -348,6 +368,10 @@ function handleRaceEvents(events) {
   for (const event of events) {
     if (event.id !== room.localId) continue;
     if (event.type === 'hit') toast('Ouch! One life used.');
+    if (event.type === 'pickup') toast(`${POWERUPS[event.powerup].name} ready! Press E / Shift or tap POWER.`);
+    if (event.type === 'attack-hit') toast(`${POWERUPS[event.powerup].name} hit! You’re slowed briefly.`);
+    if (event.type === 'shield-block') toast('Shield blocked the hit!');
+    if (event.type === 'powerup-used' && event.powerup === 'repair') toast('Repair complete!');
     if (event.type === 'out') toast('You’re out. Watch your crew run!');
   }
 }
