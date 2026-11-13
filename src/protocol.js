@@ -1,5 +1,5 @@
 export const MAX_PLAYERS = 8;
-export const ROOM_PREFIX = 'dino-party-v5-';
+export const ROOM_TOPIC_PREFIX = 'dino-party/rooms/v1/';
 export const CHARACTERS = 6;
 
 export function cleanName(value) {
@@ -21,10 +21,6 @@ export function makeRoomCode() {
   const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, byte => alphabet[byte % alphabet.length]).join('');
-}
-
-export function hostPeerId(code) {
-  return `${ROOM_PREFIX}${cleanCode(code).toLowerCase()}`;
 }
 
 export function shareUrl(code) {
